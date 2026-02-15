@@ -1,4 +1,3 @@
-user_requests = {}
 import asyncio
 import logging
 import os
@@ -14,21 +13,34 @@ from aiogram.types import (
 )
 from aiogram.filters import Command
 
+# =====================
+# НАСТРОЙКИ
+# =====================
+
 TOKEN = os.getenv("BOT_TOKEN")
+
+if not TOKEN:
+    raise ValueError("BOT_TOKEN не найден! Проверь переменные в Railway.")
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 EXCEL_FILE = "requests.xlsx"
 
-# Список снабженцев (их Telegram ID)
+# Telegram ID снабженцев
 SUPPLY_USERS = {
-    "Иван": 111111111,
-    "Петр": 222222222,
-    "Сергей": 333333333,
+    "Никита П.": 111111111,
+    "Дмитрий М.": 222222222,
+    "Николай К.": 333333333,
 }
 
-# Создание Excel если нет
+# Хранилище временных заявок
+user_requests = {}
+
+# =====================
+# ИНИЦИАЛИЗАЦИЯ EXCEL
+# =====================
+
 def init_excel():
     if not os.path.exists(EXCEL_FILE):
         df = pd.DataFrame(columns=[
@@ -45,17 +57,27 @@ def init_excel():
 
 init_excel()
 
+# =====================
+# КОМАНДА /start
+# =====================
 
-# /start
 @dp.message(Command("start"))
 async def start(message: Message):
     await message.answer("Напишите текст заявки.")
 
+# =====================
+# ПРИЁМ ЗАЯВКИ
+# =====================
 
-# Прием заявки
 @dp.message()
 async def new_request(message: Message):
     text = message.text
+
+    user_requests[message.from_user.id] = {
+        "text": text,
+        "chief_name": message.from_user.full_name,
+        "chief_id": message.from_user.id
+    }
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -70,19 +92,20 @@ async def new_request(message: Message):
 
     await message.answer("Выберите снабженца:", reply_markup=keyboard)
 
-    # временно сохраняем текст
-user_requests[message.from_user.id] = {
-    "text": text,
-    "chief_name": message.from_user.full_name,
-    "chief_id": message.from_user.id
-    }
+# =====================
+# НАЗНАЧЕНИЕ СНАБЖЕНЦА
+# =====================
 
-
-# Назначение снабженца
 @dp.callback_query(F.data.startswith("assign_"))
 async def assign_supply(callback: CallbackQuery):
     name = callback.data.split("_")[1]
     supply_id = SUPPLY_USERS[name]
+
+    data = user_requests.get(callback.from_user.id)
+
+    if not data:
+        await callback.answer("Заявка не найдена. Отправьте заново.")
+        return
 
     df = pd.read_excel(EXCEL_FILE)
 
@@ -92,9 +115,9 @@ async def assign_supply(callback: CallbackQuery):
     new_row = {
         "ID": request_id,
         "Дата": now,
-       "Начальник": data["chief_name"],
-"ID_начальника": data["chief_id"],
-"Текст": data["text"],
+        "Начальник": data["chief_name"],
+        "ID_начальника": data["chief_id"],
+        "Текст": data["text"],
         "Ответственный": name,
         "Статус": "Новая",
         "Дата_статуса": now
@@ -118,20 +141,25 @@ async def assign_supply(callback: CallbackQuery):
 
     await bot.send_message(
         supply_id,
-       f"Новая заявка №{request_id}\n\n{data['text']}",
+        f"Новая заявка №{request_id}\n\n{data['text']}",
         reply_markup=keyboard
     )
 
     await callback.message.answer(f"Заявка №{request_id} отправлена {name}.")
     await callback.answer()
 
+    del user_requests[callback.from_user.id]
 
-# В работу
+# =====================
+# СТАТУС "В РАБОТЕ"
+# =====================
+
 @dp.callback_query(F.data.startswith("work_"))
 async def set_in_work(callback: CallbackQuery):
     request_id = int(callback.data.split("_")[1])
 
     df = pd.read_excel(EXCEL_FILE)
+
     df.loc[df["ID"] == request_id, "Статус"] = "В работе"
     df.loc[df["ID"] == request_id, "Дата_статуса"] = datetime.now().strftime("%Y-%m-%d %H:%M")
     df.to_excel(EXCEL_FILE, index=False)
@@ -139,15 +167,18 @@ async def set_in_work(callback: CallbackQuery):
     chief_id = int(df[df["ID"] == request_id]["ID_начальника"].values[0])
 
     await bot.send_message(chief_id, f"Заявка №{request_id} взята в работу.")
-    await callback.answer("Статус обновлен")
+    await callback.answer("Статус обновлён")
 
+# =====================
+# СТАТУС "ЗАКУПЛЕНО"
+# =====================
 
-# Закуплено
 @dp.callback_query(F.data.startswith("done_"))
 async def set_done(callback: CallbackQuery):
     request_id = int(callback.data.split("_")[1])
 
     df = pd.read_excel(EXCEL_FILE)
+
     df.loc[df["ID"] == request_id, "Статус"] = "Закуплено"
     df.loc[df["ID"] == request_id, "Дата_статуса"] = datetime.now().strftime("%Y-%m-%d %H:%M")
     df.to_excel(EXCEL_FILE, index=False)
@@ -155,14 +186,15 @@ async def set_done(callback: CallbackQuery):
     chief_id = int(df[df["ID"] == request_id]["ID_начальника"].values[0])
 
     await bot.send_message(chief_id, f"Заявка №{request_id} выполнена ✅")
-    await callback.answer("Статус обновлен")
+    await callback.answer("Статус обновлён")
 
+# =====================
+# ЗАПУСК
+# =====================
 
-# Запуск
 async def main():
     logging.basicConfig(level=logging.INFO)
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(main())
-
