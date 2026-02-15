@@ -29,7 +29,7 @@ EXCEL_FILE = "requests.xlsx"
 
 # Telegram ID снабженцев
 SUPPLY_USERS = {
-    "Никита П.": 111111111,
+    "Никита П.": 912668230,
     "Дмитрий М.": 222222222,
     "Николай К.": 333333333,
 }
@@ -198,3 +198,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
