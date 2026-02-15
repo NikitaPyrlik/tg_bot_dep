@@ -1,3 +1,4 @@
+user_requests = {}
 import asyncio
 import logging
 import os
@@ -70,10 +71,10 @@ async def new_request(message: Message):
     await message.answer("Выберите снабженца:", reply_markup=keyboard)
 
     # временно сохраняем текст
-    bot.temp_request = {
-        "text": text,
-        "chief_name": message.from_user.full_name,
-        "chief_id": message.from_user.id
+user_requests[message.from_user.id] = {
+    "text": text,
+    "chief_name": message.from_user.full_name,
+    "chief_id": message.from_user.id
     }
 
 
@@ -91,9 +92,9 @@ async def assign_supply(callback: CallbackQuery):
     new_row = {
         "ID": request_id,
         "Дата": now,
-        "Начальник": bot.temp_request["chief_name"],
-        "ID_начальника": bot.temp_request["chief_id"],
-        "Текст": bot.temp_request["text"],
+       "Начальник": data["chief_name"],
+"ID_начальника": data["chief_id"],
+"Текст": data["text"],
         "Ответственный": name,
         "Статус": "Новая",
         "Дата_статуса": now
@@ -117,7 +118,7 @@ async def assign_supply(callback: CallbackQuery):
 
     await bot.send_message(
         supply_id,
-        f"Новая заявка №{request_id}\n\n{bot.temp_request['text']}",
+       f"Новая заявка №{request_id}\n\n{data['text']}",
         reply_markup=keyboard
     )
 
@@ -164,3 +165,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
