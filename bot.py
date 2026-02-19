@@ -11,7 +11,7 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
 from openpyxl import Workbook, load_workbook
 
-TOKEN = "YOUR_TOKEN_HERE"
+TOKEN = "8257974390:AAFmP_B9DnyM1sEns62RnmoaxOkXb02qolw"
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -279,3 +279,4 @@ async def main():
 
 if name == "main":
     asyncio.run(main())
+
